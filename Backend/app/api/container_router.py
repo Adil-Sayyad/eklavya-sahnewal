@@ -155,6 +155,27 @@ def get_container_info(container_no: str = ""):
         svc.repo.db.close()
 
 
+# ── WB-In e-survey ───────────────────────────────────────────────────────────
+
+@router.get("/wbin-survey")
+def get_wbin_survey(
+    plant_id:     int = Query(0),
+    from_date:    Optional[str] = None,
+    to_date:      Optional[str] = None,
+    container_no: Optional[str] = None,
+):
+    svc = _service()
+    try:
+        return svc.get_wbin_survey(
+            plant_id or None,
+            from_date or None,
+            to_date or None,
+            container_no or None,
+        )
+    finally:
+        svc.repo.db.close()
+
+
 # ── Update physical location (mobile) ────────────────────────────────────────
 
 @router.post("/update-physical-location")
@@ -213,6 +234,24 @@ def get_container_history_report(
     svc = _service()
     try:
         return svc.get_container_history_report(from_date, to_date, container_no, plant_id)
+    finally:
+        svc.repo.db.close()
+
+
+# ── WB In e-survey ────────────────────────────────────────────────────────────
+
+@router.get("/wbin-survey")
+def get_wbin_survey(
+    plant_id:     int = Query(0),
+    from_date:    Optional[str] = None,
+    to_date:      Optional[str] = None,
+    container_no: Optional[str] = None,
+):
+    svc = _service()
+    try:
+        return svc.get_wbin_survey(
+            plant_id or None, from_date or None, to_date or None, container_no or None
+        )
     finally:
         svc.repo.db.close()
 
