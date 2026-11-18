@@ -28,6 +28,10 @@ function prettyGateName(name) {
 // Agar backend ka max page_size limit hai to is value ko uske hisaab se adjust karein.
 const ALL_PAGE_SIZE = 100000
 
+// Naya "Complex Gate In" column is field se date uthata hai.
+// Agar Detected time chahiye to 'ComplexGateDetectedTime' kar do.
+const COMPLEX_DATE_KEY = 'ComplexGateSurveyTime'
+
 const IMAGE_SIDES = [
   { key: 'IMG_LEFT',  label: 'L',  side: 'left'  },
   { key: 'IMG_RIGHT', label: 'R',  side: 'right' },
@@ -415,7 +419,10 @@ function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, showG
                   <DetailField icon={FiClock} label="Survey Time" accent="#0284c7">
                     {row.SurveyTime ? formatDate(row.SurveyTime) : <span className="text-slate-300 font-normal">—</span>}
                   </DetailField>
-                  <DetailField icon={FiLogIn} label="Complex Gate In" accent="#059669">
+                  <DetailField icon={FiLogIn} label="Complex Gate In" accent="#0284c7">
+                    {row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : <span className="text-slate-300 font-normal">—</span>}
+                  </DetailField>
+                  <DetailField icon={FiLogIn} label="Navis Gate In" accent="#059669">
                     {row.GateInDate ? formatDate(row.GateInDate) : <span className="text-slate-300 font-normal">—</span>}
                   </DetailField>
                   {showGateOut && (
@@ -468,17 +475,17 @@ export default function PreGateInOut() {
   const gateOptions = Array.isArray(gateNamesData?.data) ? gateNamesData.data : []
 
   // ── Column layout depends on the selected gate ──────────────────────────
-  //  Maingate In  : Main Gate In Date → Complex Gate In            (no Gate Out)
-  //  Maingate Out : Complex Gate In   → Main Gate Out Date → Gate Out
-  //  Other / All  : Main Gate In Date → Complex Gate In → Gate Out (default)
+  //  Maingate In  : Main Gate In Date → Complex Gate In → Navis Gate In            (no Gate Out)
+  //  Maingate Out : Navis Gate In      → Main Gate Out Date → Complex Gate In → Gate Out
+  //  Other / All  : Main Gate In Date → Complex Gate In → Navis Gate In → Gate Out (default)
   const gateKey        = prettyGateName(gateName).toLowerCase()
   const isMainGateIn   = gateKey === 'maingate in'
   const isMainGateOut  = gateKey === 'maingate out'
   const showGateOut    = !isMainGateIn
-  const complexFirst   = isMainGateOut
+  const naviFirst      = isMainGateOut
   const mainDateLabel  = isMainGateOut ? 'Main Gate Out Date' : 'Main Gate In Date'
-  // #, Container, Size, Process, Gate, Main date, Complex In, [Gate Out], Vehicle, Images
-  const colCount       = showGateOut ? 10 : 9
+  // #, Container, Size, Process, Gate, Main date, Complex In (new), Navis In, [Gate Out], Vehicle, Images
+  const colCount       = showGateOut ? 11 : 10
 
   // No pagination — always request everything in a single call.
   const buildArgs = useCallback((gateNameOverride, gateFilterOverride) => {
@@ -565,7 +572,8 @@ export default function PreGateInOut() {
     if (!rows.length) return
     const sheetData = rows.map((row, i) => {
       const mainDate    = row.SurveyTime  ? formatDate(row.SurveyTime)  : ''
-      const complexIn   = row.GateInDate  ? formatDate(row.GateInDate)  : ''
+      const complexIn   = row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : ''
+      const naviIn      = row.GateInDate  ? formatDate(row.GateInDate)  : ''
       const gateOutDate = row.GateOutDate ? formatDate(row.GateOutDate) : ''
 
       const out = {
@@ -577,12 +585,14 @@ export default function PreGateInOut() {
         'Gate':           row.GateName      || '',
         'Direction':      row.GateType      || '',
       }
-      if (complexFirst) {
-        out['Complex Gate In'] = complexIn
-        out[mainDateLabel]     = mainDate
+      if (naviFirst) {
+        out['Navis Gate In']     = naviIn
+        out[mainDateLabel]      = mainDate
+        out['Complex Gate In']  = complexIn
       } else {
-        out[mainDateLabel]     = mainDate
-        out['Complex Gate In'] = complexIn
+        out[mainDateLabel]      = mainDate
+        out['Complex Gate In']  = complexIn
+        out['Navis Gate In']     = naviIn
       }
       if (showGateOut) out['Gate Out'] = gateOutDate
       out['Location']    = row.Location    || ''
@@ -654,7 +664,7 @@ export default function PreGateInOut() {
             />
             {!isMainGateOut && (
             <StatCard
-              label={isMainGateIn ? 'Gate In' : 'Complex Gate In'}
+              label={isMainGateIn ? 'Gate In' : 'Navis Gate In'}
               value={gate_in_count}
               icon={FiLogIn}
               tone="emerald"
@@ -834,15 +844,17 @@ export default function PreGateInOut() {
                       <TH col="GateName">Gate</TH>
 
                       {/* Date columns — order depends on selected gate */}
-                      {complexFirst ? (
+                      {naviFirst ? (
                         <>
-                          <TH col="GateInDate">Complex Gate In</TH>
+                          <TH col="GateInDate">Navis Gate In</TH>
                           <TH col="SurveyTime">{mainDateLabel}</TH>
+                          <TH col={COMPLEX_DATE_KEY}>Complex Gate In</TH>
                         </>
                       ) : (
                         <>
                           <TH col="SurveyTime">{mainDateLabel}</TH>
-                          <TH col="GateInDate">Complex Gate In</TH>
+                          <TH col={COMPLEX_DATE_KEY}>Complex Gate In</TH>
+                          <TH col="GateInDate">Navis Gate In</TH>
                         </>
                       )}
                       {showGateOut && <TH col="GateOutDate">Gate Out</TH>}
@@ -876,9 +888,19 @@ export default function PreGateInOut() {
                         </td>
                       )
 
-                      // Complex Gate In
+                      // Complex Gate In (new column — ComplexGateSurveyTime)
                       const complexInCell = (
                         <td key="complex" className="px-3 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <FiLogIn className="text-sky-400 flex-shrink-0" size={11} />
+                            <DateCell raw={row[COMPLEX_DATE_KEY]} />
+                          </div>
+                        </td>
+                      )
+
+                      // Navis Gate In (old "Complex Gate In" — GateInDate)
+                      const naviInCell = (
+                        <td key="navi" className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
                             <FiLogIn className="text-emerald-400 flex-shrink-0" size={11} />
                             <DateCell raw={row.GateInDate} highlight={isIn} />
@@ -939,15 +961,17 @@ export default function PreGateInOut() {
                           </td>
 
                           {/* Date columns — same order as the header */}
-                          {complexFirst ? (
+                          {naviFirst ? (
                             <>
-                              {complexInCell}
+                              {naviInCell}
                               {mainDateCell}
+                              {complexInCell}
                             </>
                           ) : (
                             <>
                               {mainDateCell}
                               {complexInCell}
+                              {naviInCell}
                             </>
                           )}
                           {showGateOut && gateOutCell}

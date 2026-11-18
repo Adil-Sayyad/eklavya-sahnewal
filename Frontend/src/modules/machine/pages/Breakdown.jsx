@@ -28,9 +28,26 @@ const REMARK_META = {
   'Change':       { color: 'amber',  icon: FiSettings,     bg: 'bg-amber-50',   text: 'text-amber-700',  badge: 'bg-amber-100 text-amber-700', ring: 'ring-amber-400' },
 }
 
+const END_BEFORE_START_MSG = 'End Time must be after Start Time (on the same date, the time must also be later).'
+
+// Add/subtract minutes on a "YYYY-MM-DDTHH:mm" value (local time). The min/max
+// attributes of datetime-local are inclusive, so a +/-1 minute shift is used to
+// enforce "strictly after".
+function shiftMinutes(value, delta) {
+  if (!value) return undefined
+  const d = new Date(value)
+  if (isNaN(d)) return undefined
+  d.setMinutes(d.getMinutes() + delta)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// TAT between Start and End. Returns '—' when End is not after Start
+// (Math.abs previously showed a wrong positive TAT for reversed dates).
 function calcTAT(start, end) {
   if (!start || !end) return '—'
-  const diff = Math.abs(new Date(end) - new Date(start))
+  const diff = new Date(end) - new Date(start)
+  if (isNaN(diff) || diff <= 0) return '—'
   const h = Math.floor(diff / 3600000)
   const m = Math.floor((diff % 3600000) / 60000)
   return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`
@@ -72,6 +89,7 @@ export default function Breakdown() {
   const [editRow, setEditRow] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
+  const [formError, setFormError] = useState('')
   const [form, setForm] = useState({ brkid: 0, vehicle_id: '', maintance_start: '', maintance_end: '', reason: '', category: '' })
 
   // Real API data
@@ -123,11 +141,36 @@ export default function Breakdown() {
     }
   }, [selectedEqp])
 
+  // ── Start / End Time handlers ───────────────────────────────
+  // If Start changes and End (date + time) is no longer after it, clear End
+  // so the user picks a valid End Time again.
+  const handleStartChange = (value) => {
+    setFormError('')
+    setForm(f => {
+      const next = { ...f, maintance_start: value }
+      if (value && f.maintance_end && f.maintance_end <= value) {
+        next.maintance_end = ''
+      }
+      return next
+    })
+  }
+
+  // End Time (date + time) must be strictly after Start Time.
+  const handleEndChange = (value) => {
+    if (form.maintance_start && value && value <= form.maintance_start) {
+      setFormError(END_BEFORE_START_MSG)
+      return
+    }
+    setFormError('')
+    setForm(f => ({ ...f, maintance_end: value }))
+  }
+
   const handleMachineClick = (eqp) => {
     setSelectedEqp(eqp)
     setShowForm(false)
     setFormMode('add')
     setEditRow(null)
+    setFormError('')
     setForm({ brkid: 0, vehicle_id: getEqpId(eqp), maintance_start: '', maintance_end: '', reason: '', category: '' })
   }
 
@@ -135,6 +178,7 @@ export default function Breakdown() {
     if (!selectedEqp) { notify.warning('Please select a machine first'); return }
     setFormMode('add')
     setEditRow(null)
+    setFormError('')
     setForm({ brkid: 0, vehicle_id: getEqpId(selectedEqp), maintance_start: '', maintance_end: '', reason: '', category: '' })
     setShowForm(true)
   }
@@ -142,6 +186,7 @@ export default function Breakdown() {
   const openEditForm = (row) => {
     setFormMode('edit')
     setEditRow(row)
+    setFormError('')
     const brkid   = row.BRKID || row.BrkId || row.brkid || 0
     // GET_BREAKDOWN_DETAIL returns only EqpName (text), no equipment ID —
     // resolve it back to an EqpID via the already-loaded machines list so
@@ -165,6 +210,12 @@ export default function Breakdown() {
       notify.warning('Machine, Start Time and Reason are required')
       return
     }
+    if (form.maintance_end && form.maintance_end <= form.maintance_start) {
+      setFormError(END_BEFORE_START_MSG)
+      notify.warning(END_BEFORE_START_MSG)
+      return
+    }
+    setFormError('')
     const payload = {
       brkid:          Number(form.brkid) || 0,
       vehicle_id:     Number(form.vehicle_id),
@@ -443,7 +494,8 @@ export default function Breakdown() {
                       <input
                         type="datetime-local"
                         value={form.maintance_start}
-                        onChange={e => setForm(f => ({ ...f, maintance_start: e.target.value }))}
+                        max={shiftMinutes(form.maintance_end, -1)}
+                        onChange={e => handleStartChange(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0e4a78]/40 focus:border-[#0e4a78] transition shadow-sm"
                       />
                     </div>
@@ -457,11 +509,23 @@ export default function Breakdown() {
                       <input
                         type="datetime-local"
                         value={form.maintance_end}
-                        onChange={e => setForm(f => ({ ...f, maintance_end: e.target.value }))}
-                        className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0e4a78]/40 focus:border-[#0e4a78] transition shadow-sm"
+                        min={shiftMinutes(form.maintance_start, 1)}
+                        onChange={e => handleEndChange(e.target.value)}
+                        className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 transition shadow-sm ${
+                          formError
+                            ? 'border-red-400 focus:ring-red-300 focus:border-red-400'
+                            : 'border-slate-300 focus:ring-[#0e4a78]/40 focus:border-[#0e4a78]'
+                        }`}
                       />
                     </div>
                   </div>
+
+                  {formError && (
+                    <div className="grid grid-cols-12 items-center gap-3 -mt-2">
+                      <div className="col-span-3" />
+                      <p className="col-span-9 text-xs font-semibold text-red-500">{formError}</p>
+                    </div>
+                  )}
 
                   {/* CATEGORY */}
                   <div className="grid grid-cols-12 items-center gap-3">
