@@ -724,7 +724,6 @@ class UpdateLocationRequest(BaseModel):
             )
         return v
 
-
 @router.post("/update-physical-location")
 def update_physical_container_location(body: UpdateLocationRequest):
     db = SQLManager()
