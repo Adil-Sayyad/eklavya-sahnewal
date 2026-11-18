@@ -22,8 +22,11 @@ class UpdateLocationRequest(BaseModel):
     def validate_location(cls, v: str) -> str:
         v = v.strip()
         parts = [p.strip() for p in v.split(":")]
-        if len(parts) < 4 or any(p == "" for p in parts):
-            raise ValueError("location must be Block:Row:Column:Stack  e.g. B2:C:8:2")
+        if len(parts) not in (3, 4) or any(p == "" for p in parts):
+            raise ValueError(
+                "location must be Block:Column:Stack (rowless, e.g. EMR:1:1) "
+                "or Block:Row:Column:Stack (e.g. B2:C:8:2)"
+            )
         return v
 
 

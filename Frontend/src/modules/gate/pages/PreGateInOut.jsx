@@ -28,9 +28,12 @@ function prettyGateName(name) {
 // Agar backend ka max page_size limit hai to is value ko uske hisaab se adjust karein.
 const ALL_PAGE_SIZE = 100000
 
-// Naya "Complex Gate In" column is field se date uthata hai.
+// "Complex Gate In / Out" column is field se date uthata hai.
 // Agar Detected time chahiye to 'ComplexGateDetectedTime' kar do.
 const COMPLEX_DATE_KEY = 'ComplexGateSurveyTime'
+
+// Dropdown me sirf yehi 2 gate dikhenge (lowercase pretty name se match hota hai)
+const ALLOWED_GATES = ['maingate in', 'maingate out']
 
 const IMAGE_SIDES = [
   { key: 'IMG_LEFT',  label: 'L',  side: 'left'  },
@@ -294,9 +297,10 @@ function ImageSlot({ url, label, accent, onZoom }) {
 }
 
 /* ─── Detail Modal — details on top (container | gate/vehicle), 6 images below ── */
-function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, showGateOut = true }) {
+function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, isMainGateOut = false, mainDateLabel = 'Main Gate In Date' }) {
   if (!row) return null
   const isIn = row.GateType === 'GATE_IN'
+  const dash = <span className="text-slate-300 font-normal">—</span>
 
   return (
     <div
@@ -359,9 +363,7 @@ function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, showG
           </div>
         </div>
 
-        {/* Body — details on top (container | gate/vehicle side-by-side),
-            images fill the rest — flex-col with the images pane as flex-1
-            so everything fits in the modal's fixed height, no page scroll. */}
+        {/* Body */}
         <div className="flex-1 min-h-0 flex flex-col bg-slate-100">
 
           {/* Top — details */}
@@ -392,19 +394,19 @@ function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, showG
                   <DetailField icon={FiHash} label="Size / Type" accent="#0e4a78">
                     {(row.ContSize || row.ContType)
                       ? `${row.ContSize || '—'} ${row.ContType || ''}`.trim()
-                      : <span className="text-slate-300 font-normal">—</span>}
+                      : dash}
                   </DetailField>
                   <DetailField icon={FiClock} label="Process" accent="#059669">
-                    {row.Process || <span className="text-slate-300 font-normal">—</span>}
+                    {row.Process || dash}
                   </DetailField>
                   <DetailField icon={FiHash} label="Document No" accent="#64748b">
-                    {row.DocumentNo || <span className="text-slate-300 font-normal">—</span>}
+                    {row.DocumentNo || dash}
                   </DetailField>
                   <DetailField icon={FiHash} label="Status" accent="#7c3aed">
-                    {row.Status || <span className="text-slate-300 font-normal">—</span>}
+                    {row.Status || dash}
                   </DetailField>
                   <DetailField icon={FiMapPin} label="Location" accent="#d97706">
-                    {row.Location || <span className="text-slate-300 font-normal">—</span>}
+                    {row.Location || dash}
                   </DetailField>
                 </DetailCard>
 
@@ -414,28 +416,40 @@ function DetailModal({ row, index, total, onClose, onPrev, onNext, onZoom, showG
                     {row.VehicleNo || <span className="text-slate-300 font-normal">Not captured</span>}
                   </DetailField>
                   <DetailField icon={FiHome} label="Gate" accent="#d97706">
-                    {row.GateName || <span className="text-slate-300 font-normal">—</span>}
+                    {row.GateName || dash}
                   </DetailField>
-                  <DetailField icon={FiClock} label="Survey Time" accent="#0284c7">
-                    {row.SurveyTime ? formatDate(row.SurveyTime) : <span className="text-slate-300 font-normal">—</span>}
-                  </DetailField>
-                  <DetailField icon={FiLogIn} label="Complex Gate In" accent="#0284c7">
-                    {row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : <span className="text-slate-300 font-normal">—</span>}
-                  </DetailField>
-                  <DetailField icon={FiLogIn} label="Navis Gate In" accent="#059669">
-                    {row.GateInDate ? formatDate(row.GateInDate) : <span className="text-slate-300 font-normal">—</span>}
-                  </DetailField>
-                  {showGateOut && (
-                    <DetailField icon={FiLogOut} label="Gate Out" accent="#d97706">
-                      {row.GateOutDate ? formatDate(row.GateOutDate) : <span className="text-slate-300 font-normal">—</span>}
-                    </DetailField>
+
+                  {isMainGateOut ? (
+                    <>
+                      <DetailField icon={FiLogOut} label="Gate Out" accent="#d97706">
+                        {row.GateOutDate ? formatDate(row.GateOutDate) : dash}
+                      </DetailField>
+                      <DetailField icon={FiLogOut} label="Complex Gate Out" accent="#0284c7">
+                        {row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : dash}
+                      </DetailField>
+                      <DetailField icon={FiClock} label={mainDateLabel} accent="#0284c7">
+                        {row.SurveyTime ? formatDate(row.SurveyTime) : dash}
+                      </DetailField>
+                    </>
+                  ) : (
+                    <>
+                      <DetailField icon={FiClock} label={mainDateLabel} accent="#0284c7">
+                        {row.SurveyTime ? formatDate(row.SurveyTime) : dash}
+                      </DetailField>
+                      <DetailField icon={FiLogIn} label="Complex Gate In" accent="#0284c7">
+                        {row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : dash}
+                      </DetailField>
+                      <DetailField icon={FiLogIn} label="Navis Gate In" accent="#059669">
+                        {row.GateInDate ? formatDate(row.GateInDate) : dash}
+                      </DetailField>
+                    </>
                   )}
                 </DetailCard>
               </div>
             </div>
           </div>
 
-          {/* Bottom — 6 images (left/right/top + left/right/top damage), fills remaining modal height */}
+          {/* Bottom — 6 images */}
           <div className="flex-1 min-h-0">
             <div className="p-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 h-full">
               {[
@@ -462,7 +476,8 @@ export default function PreGateInOut() {
   const [toDate,      setToDate]      = useState('')
   const [containerNo, setContainerNo] = useState('')
   const [gateFilter,  setGateFilter]  = useState('ALL')
-  const [gateName,    setGateName]    = useState('')
+  const [gateName,    setGateName]    = useState('')   // dropdown me jo select hai
+  const [appliedGate, setAppliedGate] = useState('')   // jis gate ke liye Search/fetch hua — table layout isse chalta hai
   const [sortCol,     setSortCol]     = useState('SurveyTime')
   const [sortDir,     setSortDir]     = useState('desc')
   const [lightbox,    setLightbox]    = useState(null)
@@ -472,20 +487,27 @@ export default function PreGateInOut() {
 
   const [fetchSurvey, { data, isFetching, isError }] = useLazyGetPreGateSurveyQuery()
   const { data: gateNamesData, isSuccess: gateNamesLoaded, isError: gateNamesFailed } = useGetGateNamesQuery()
-  const gateOptions = Array.isArray(gateNamesData?.data) ? gateNamesData.data : []
+  const allGateOptions = Array.isArray(gateNamesData?.data) ? gateNamesData.data : []
 
-  // ── Column layout depends on the selected gate ──────────────────────────
-  //  Maingate In  : Main Gate In Date → Complex Gate In → Navis Gate In            (no Gate Out)
-  //  Maingate Out : Navis Gate In      → Main Gate Out Date → Complex Gate In → Gate Out
-  //  Other / All  : Main Gate In Date → Complex Gate In → Navis Gate In → Gate Out (default)
-  const gateKey        = prettyGateName(gateName).toLowerCase()
-  const isMainGateIn   = gateKey === 'maingate in'
+  // Dropdown me sirf Maingate In / Maingate Out (In pehle)
+  const gateOptions = allGateOptions
+    .filter(g => ALLOWED_GATES.includes(prettyGateName(g).toLowerCase()))
+    .sort((a, b) =>
+      ALLOWED_GATES.indexOf(prettyGateName(a).toLowerCase()) -
+      ALLOWED_GATES.indexOf(prettyGateName(b).toLowerCase())
+    )
+  const defaultGate = gateOptions.find(g => prettyGateName(g).toLowerCase() === 'maingate in') || ''
+
+  // ── Column layout — Search ke baad jo gate applied hua uske hisaab se ───
+  //  Maingate In  : Main Gate In Date → Complex Gate In → Navis Gate In
+  //  Maingate Out : Gate Out → Complex Gate Out → Main Gate Out Date   (Navis Gate In nahi)
+  //  Fallback     : Maingate In wala layout
+  const gateKey        = prettyGateName(appliedGate).toLowerCase()
   const isMainGateOut  = gateKey === 'maingate out'
-  const showGateOut    = !isMainGateIn
-  const naviFirst      = isMainGateOut
+  const isMainGateIn   = !isMainGateOut
   const mainDateLabel  = isMainGateOut ? 'Main Gate Out Date' : 'Main Gate In Date'
-  // #, Container, Size, Process, Gate, Main date, Complex In (new), Navis In, [Gate Out], Vehicle, Images
-  const colCount       = showGateOut ? 11 : 10
+  // #, Container, Size, Process, Gate, 3 date columns, Vehicle, Images
+  const colCount       = 10
 
   // No pagination — always request everything in a single call.
   const buildArgs = useCallback((gateNameOverride, gateFilterOverride) => {
@@ -500,29 +522,42 @@ export default function PreGateInOut() {
     return args
   }, [fromDate, toDate, containerNo, gateFilter, gateName])
 
-  // Default gate filter to "Maingate In" once the real gate names load —
-  // the raw DB value's exact casing/format isn't known ahead of time, so
-  // match it out of gateOptions rather than hardcoding a string. Falls back
-  // to an unfiltered fetch if the gate-names call comes back empty or fails,
-  // so the report still loads either way.
+  // Fetch + applied gate set (layout isi se badalta hai)
+  const runFetch = (gateNameOverride, gateFilterOverride) => {
+    const gn = gateNameOverride !== undefined ? gateNameOverride : gateName
+    setAppliedGate(gn)
+    fetchSurvey(buildArgs(gn, gateFilterOverride))
+  }
+
+  // Default gate "Maingate In" jab gate names load ho jaye.
+  // Agar gate-names call fail/empty ho to unfiltered fetch (report phir bhi load hoga).
   useEffect(() => {
     if (gateName || (!gateNamesLoaded && !gateNamesFailed)) return
-    const defaultGate = gateOptions.find(g => prettyGateName(g).toLowerCase() === 'maingate in')
     if (defaultGate) {
       setGateName(defaultGate)
-      fetchSurvey(buildArgs(defaultGate))
+      runFetch(defaultGate)
     } else {
-      fetchSurvey(buildArgs())
+      runFetch('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateNamesLoaded, gateNamesFailed])
 
-  const handleSearch = () => { fetchSurvey(buildArgs()) }
+  const handleSearch = () => {
+    setGateFilter('ALL')
+    setProcessFilter('all')
+    setSizeFilter('all')
+    runFetch(undefined, 'ALL')
+  }
 
   const handleClear = () => {
     setFromDate(''); setToDate('')
-    setContainerNo(''); setGateFilter('ALL'); setGateName('')
-    fetchSurvey({ page: 1, page_size: ALL_PAGE_SIZE })
+    setContainerNo(''); setGateFilter('ALL')
+    setProcessFilter('all'); setSizeFilter('all')
+    setGateName(defaultGate)
+    setAppliedGate(defaultGate)
+    const args = { page: 1, page_size: ALL_PAGE_SIZE }
+    if (defaultGate) args.gate_name = defaultGate
+    fetchSurvey(args)
   }
 
   const toggleSort = (col) => {
@@ -566,13 +601,13 @@ export default function PreGateInOut() {
     ? processRows
     : processRows.filter(r => sizeOf(r) === sizeFilter)
 
-  // Export — saara data pehle se load hai, isliye alag API call ki zaroorat nahi.
-  // Column order / Gate Out visibility table ke saath match karta hai.
+  // Export — saara data pehle se load hai, alag API call ki zaroorat nahi.
+  // Column order table ke saath match karta hai.
   const handleExport = () => {
     if (!rows.length) return
     const sheetData = rows.map((row, i) => {
       const mainDate    = row.SurveyTime  ? formatDate(row.SurveyTime)  : ''
-      const complexIn   = row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : ''
+      const complexDate = row[COMPLEX_DATE_KEY] ? formatDate(row[COMPLEX_DATE_KEY]) : ''
       const naviIn      = row.GateInDate  ? formatDate(row.GateInDate)  : ''
       const gateOutDate = row.GateOutDate ? formatDate(row.GateOutDate) : ''
 
@@ -585,16 +620,15 @@ export default function PreGateInOut() {
         'Gate':           row.GateName      || '',
         'Direction':      row.GateType      || '',
       }
-      if (naviFirst) {
-        out['Navis Gate In']     = naviIn
-        out[mainDateLabel]      = mainDate
-        out['Complex Gate In']  = complexIn
+      if (isMainGateOut) {
+        out['Gate Out']          = gateOutDate
+        out['Complex Gate Out']  = complexDate
+        out[mainDateLabel]       = mainDate
       } else {
-        out[mainDateLabel]      = mainDate
-        out['Complex Gate In']  = complexIn
+        out[mainDateLabel]       = mainDate
+        out['Complex Gate In']   = complexDate
         out['Navis Gate In']     = naviIn
       }
-      if (showGateOut) out['Gate Out'] = gateOutDate
       out['Location']    = row.Location    || ''
       out['Vehicle No']  = row.VehicleNo   || ''
       out['Document No'] = row.DocumentNo  || ''
@@ -640,7 +674,7 @@ export default function PreGateInOut() {
           <header className="pt-6 pb-4">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Gate Management</p>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#0e4a78] flex items-center gap-2 mt-0.5">
-              <FaTruck /> Main Gate In Report
+              <FaTruck /> {isMainGateOut ? 'Main Gate Out Report' : 'Main Gate In Report'}
             </h1>
             <p className="text-slate-500 mt-0.5 text-sm">
               {total.toLocaleString()} total records
@@ -658,29 +692,29 @@ export default function PreGateInOut() {
               isActive={gateFilter === 'ALL' && processFilter === 'all'}
               onClick={() => {
                 setGateFilter('ALL'); setProcessFilter('all'); setSizeFilter('all')
-                fetchSurvey(buildArgs(undefined, 'ALL'))
+                runFetch(appliedGate, 'ALL')
               }}
               total={total}
             />
-            {!isMainGateOut && (
+            {isMainGateIn && (
             <StatCard
-              label={isMainGateIn ? 'Gate In' : 'Navis Gate In'}
+              label="Gate In"
               value={gate_in_count}
               icon={FiLogIn}
               tone="emerald"
               isActive={gateFilter === 'GATE_IN'}
-              onClick={() => { setGateFilter('GATE_IN'); fetchSurvey(buildArgs(undefined, 'GATE_IN')) }}
+              onClick={() => { setGateFilter('GATE_IN'); runFetch(appliedGate, 'GATE_IN') }}
               total={total}
             />
             )}
-            {!isMainGateIn && (
+            {isMainGateOut && (
             <StatCard
               label="Gate Out"
               value={gate_out_count}
               icon={FiLogOut}
               tone="amber"
               isActive={gateFilter === 'GATE_OUT'}
-              onClick={() => { setGateFilter('GATE_OUT'); fetchSurvey(buildArgs(undefined, 'GATE_OUT')) }}
+              onClick={() => { setGateFilter('GATE_OUT'); runFetch(appliedGate, 'GATE_OUT') }}
               total={total}
             />
             )}
@@ -740,7 +774,7 @@ export default function PreGateInOut() {
             />
           </StatGrid>
 
-          {/* ── Filter Bar — plain white toolbar, deliberately distinct from the stats zone above ── */}
+          {/* ── Filter Bar ── */}
           <FilterBar bare>
             <FilterField label="From Date" icon={FiCalendar}>
               <input
@@ -758,6 +792,7 @@ export default function PreGateInOut() {
               />
             </FilterField>
 
+            {/* Gate — sirf Maingate In / Maingate Out */}
             <FilterSelect
               label="Gate"
               icon={FiFilter}
@@ -765,12 +800,9 @@ export default function PreGateInOut() {
               onChange={e => setGateName(e.target.value)}
               className="min-w-[160px]"
             >
-              <option value="">All Gates</option>
-              {gateOptions
-                .filter(g => !['complexgate', 'railgate', 'unknown gate'].includes(prettyGateName(g).toLowerCase()))
-                .map(g => (
-                  <option key={g} value={g}>{prettyGateName(g)}</option>
-                ))}
+              {gateOptions.map(g => (
+                <option key={g} value={g}>{prettyGateName(g)}</option>
+              ))}
             </FilterSelect>
 
             <FilterField label="Container No" icon={FiSearch} className="flex-1 min-w-[180px]">
@@ -843,12 +875,12 @@ export default function PreGateInOut() {
                       <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider whitespace-nowrap">Process</th>
                       <TH col="GateName">Gate</TH>
 
-                      {/* Date columns — order depends on selected gate */}
-                      {naviFirst ? (
+                      {/* Date columns — order depends on applied gate */}
+                      {isMainGateOut ? (
                         <>
-                          <TH col="GateInDate">Navis Gate In</TH>
+                          <TH col="GateOutDate">Gate Out</TH>
+                          <TH col={COMPLEX_DATE_KEY}>Complex Gate Out</TH>
                           <TH col="SurveyTime">{mainDateLabel}</TH>
-                          <TH col={COMPLEX_DATE_KEY}>Complex Gate In</TH>
                         </>
                       ) : (
                         <>
@@ -857,9 +889,7 @@ export default function PreGateInOut() {
                           <TH col="GateInDate">Navis Gate In</TH>
                         </>
                       )}
-                      {showGateOut && <TH col="GateOutDate">Gate Out</TH>}
 
-                      {/* <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider whitespace-nowrap">Location</th> */}
                       <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider whitespace-nowrap">Vehicle No</th>
                       <th className="px-2 py-2 text-center font-semibold uppercase tracking-wider w-52">Images</th>
                     </tr>
@@ -878,7 +908,7 @@ export default function PreGateInOut() {
                       const serial = idx + 1
                       const isIn = row.GateType === 'GATE_IN'
 
-                      // Survey Time (Main Gate In / Out date)
+                      // Main Gate In / Out date (SurveyTime)
                       const mainDateCell = (
                         <td key="main" className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
@@ -888,17 +918,19 @@ export default function PreGateInOut() {
                         </td>
                       )
 
-                      // Complex Gate In (new column — ComplexGateSurveyTime)
-                      const complexInCell = (
+                      // Complex Gate In (In layout) / Complex Gate Out (Out layout) — ComplexGateSurveyTime
+                      const complexCell = (
                         <td key="complex" className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
-                            <FiLogIn className="text-sky-400 flex-shrink-0" size={11} />
+                            {isMainGateOut
+                              ? <FiLogOut className="text-sky-400 flex-shrink-0" size={11} />
+                              : <FiLogIn  className="text-sky-400 flex-shrink-0" size={11} />}
                             <DateCell raw={row[COMPLEX_DATE_KEY]} />
                           </div>
                         </td>
                       )
 
-                      // Navis Gate In (old "Complex Gate In" — GateInDate)
+                      // Navis Gate In — sirf Maingate In layout me
                       const naviInCell = (
                         <td key="navi" className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
@@ -908,7 +940,7 @@ export default function PreGateInOut() {
                         </td>
                       )
 
-                      // Gate Out
+                      // Gate Out — sirf Maingate Out layout me (pehla date column)
                       const gateOutCell = (
                         <td key="out" className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
@@ -961,26 +993,19 @@ export default function PreGateInOut() {
                           </td>
 
                           {/* Date columns — same order as the header */}
-                          {naviFirst ? (
+                          {isMainGateOut ? (
                             <>
-                              {naviInCell}
+                              {gateOutCell}
+                              {complexCell}
                               {mainDateCell}
-                              {complexInCell}
                             </>
                           ) : (
                             <>
                               {mainDateCell}
-                              {complexInCell}
+                              {complexCell}
                               {naviInCell}
                             </>
                           )}
-                          {showGateOut && gateOutCell}
-
-                          {/* <td className="px-3 py-2 text-[11px] text-slate-600 whitespace-nowrap max-w-[140px] truncate">
-                            {row.Location
-                              ? <span className="inline-flex items-center gap-1"><FiMapPin size={10} className="text-slate-400" />{row.Location}</span>
-                              : <span className="text-slate-300 text-xs">—</span>}
-                          </td> */}
 
                           <td className="px-3 py-2 text-[11px] text-slate-600 whitespace-nowrap">
                             {row.VehicleNo
@@ -999,7 +1024,7 @@ export default function PreGateInOut() {
               </div>
             )}
 
-            {/* Footer count (pagination ki jagah) */}
+            {/* Footer count */}
             {!isFetching && !isError && (
               <div className="px-5 py-3 bg-slate-50 border-t border-slate-200">
                 <span className="text-xs text-slate-500">
@@ -1019,7 +1044,8 @@ export default function PreGateInOut() {
           row={rows[detailIdx]}
           index={detailIdx}
           total={rows.length}
-          showGateOut={showGateOut}
+          isMainGateOut={isMainGateOut}
+          mainDateLabel={mainDateLabel}
           onClose={() => setDetailIdx(null)}
           onPrev={() => setDetailIdx(i => Math.max(0, i - 1))}
           onNext={() => setDetailIdx(i => Math.min(rows.length - 1, i + 1))}
@@ -1027,10 +1053,7 @@ export default function PreGateInOut() {
         />
       )}
 
-      {/* Rendered after DetailModal so it stacks visually on top when
-          opened from inside it (both are fixed inset-0 overlays with the
-          same z-50 — later in the DOM wins) instead of being hidden behind
-          the modal's own backdrop. */}
+      {/* Rendered after DetailModal so it stacks on top when opened from inside it. */}
       {lightbox && (
         <ImageLightbox url={lightbox.url} label={lightbox.label} onClose={() => setLightbox(null)} />
       )}

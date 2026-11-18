@@ -18,6 +18,9 @@ const fmtLogDate = (val) => {
 
 const HEIGHTS = [1, 2, 3, 4]
 
+// Blocks that have no Row (location = BLOCK:COLUMN:HEIGHT)
+const ROWLESS_BLOCKS = ['EMR']
+
 // Used only if the get-block-list API call fails or returns no data.
 // NOTE: EXP has an inconsistent Column range in the source SP data
 // (MinColumn "16" vs MaxColumn "G" don't form a valid range) — kept as-is
@@ -173,6 +176,9 @@ const InventoryMapping = () => {
     [blocks, blockName]
   )
 
+  // EMR (and any block in ROWLESS_BLOCKS) has no Row
+  const isRowless = ROWLESS_BLOCKS.includes(blockName.trim().toUpperCase())
+
   const rowOptions = useMemo(
     () => (selectedBlock ? letterRange(selectedBlock.minRow, selectedBlock.maxRow) : []),
     [selectedBlock]
@@ -201,7 +207,7 @@ const InventoryMapping = () => {
       notify.warning('Validation', 'Please select a Block / Yard')
       return
     }
-    if (!rowNo) {
+    if (!isRowless && !rowNo) {
       notify.warning('Validation', 'Please select a Row')
       return
     }
@@ -212,7 +218,10 @@ const InventoryMapping = () => {
     }
 
     try {
-      const location = `${blockName}:${rowNo}:${columnNo}:${height}`
+      const location = isRowless
+        ? `${blockName}:${columnNo}:${height}`
+        : `${blockName}:${rowNo}:${columnNo}:${height}`
+
       const result = await updateLocation({
         container_no: containerNo.trim().toUpperCase(),
         location,
@@ -306,7 +315,7 @@ const InventoryMapping = () => {
 
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Block / Yard */}
-                <div>
+                <div className={isRowless ? 'col-span-2' : ''}>
                   <FieldLabel icon={FiGrid}>Block</FieldLabel>
                   <select
                     value={blockName}
@@ -321,21 +330,23 @@ const InventoryMapping = () => {
                   </select>
                 </div>
 
-                {/* Row */}
-                <div>
-                  <FieldLabel icon={FiLayers}>Row</FieldLabel>
-                  <select
-                    value={rowNo}
-                    onChange={(e) => setRowNo(e.target.value)}
-                    disabled={!blockName}
-                    className="w-full px-3 py-2 rounded-lg border-2 border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0e4a78]/30 focus:border-[#0e4a78] text-sm font-medium text-slate-800 transition-colors shadow-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">{blockName ? 'Select' : '—'}</option>
-                    {rowOptions.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Row — hidden for EMR */}
+                {!isRowless && (
+                  <div>
+                    <FieldLabel icon={FiLayers}>Row</FieldLabel>
+                    <select
+                      value={rowNo}
+                      onChange={(e) => setRowNo(e.target.value)}
+                      disabled={!blockName}
+                      className="w-full px-3 py-2 rounded-lg border-2 border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0e4a78]/30 focus:border-[#0e4a78] text-sm font-medium text-slate-800 transition-colors shadow-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">{blockName ? 'Select' : '—'}</option>
+                      {rowOptions.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Column */}

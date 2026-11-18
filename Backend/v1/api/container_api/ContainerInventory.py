@@ -716,8 +716,12 @@ class UpdateLocationRequest(BaseModel):
         if not v:
             raise ValueError("location cannot be empty")
         parts = [p.strip() for p in v.split(":")]
-        if len(parts) < 4 or any(p == "" for p in parts):
-            raise ValueError("location must be Block:Row:Column:Stack  e.g. B2:C:8:2")
+        # 3-part = rowless blocks (e.g. EMR:1:1), 4-part = normal blocks (e.g. B2:C:8:2)
+        if len(parts) not in (3, 4) or any(p == "" for p in parts):
+            raise ValueError(
+                "location must be Block:Column:Stack (rowless, e.g. EMR:1:1) "
+                "or Block:Row:Column:Stack (e.g. B2:C:8:2)"
+            )
         return v
 
 

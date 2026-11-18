@@ -12,6 +12,9 @@ class GlobalExceptionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
             return await call_next(request)
+        except RequestValidationError:
+            # Let FastAPI's registered 422 handler deal with validation errors
+            raise
         except Exception as e:
             logger.error(f"Unhandled exception on {request.url}: {e}", exc_info=True)
             return JSONResponse(
@@ -50,13 +53,25 @@ def setup_exception_handlers(app: FastAPI):
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        logger.warning(f"Validation error on {request.url}: {exc.errors()}")
+        # Pydantic v2: exc.errors() mein ctx['error'] ek ValueError object hota hai
+        # jo JSON serializable nahi hota — str() se convert karo
+        def _clean_errors(errors: list) -> list:
+            cleaned = []
+            for e in errors:
+                err = dict(e)
+                if "ctx" in err:
+                    err["ctx"] = {k: str(v) for k, v in err["ctx"].items()}
+                cleaned.append(err)
+            return cleaned
+
+        cleaned = _clean_errors(exc.errors())
+        logger.warning(f"Validation error on {request.url}: {cleaned}")
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "success": False,
                 "message": "Validation Error",
-                "data": exc.errors()
+                "data": cleaned
             }
         )
 
